@@ -32,16 +32,32 @@ xp, yp = 0, 0
 imgCanvas = np.zeros((720, 1280, 3), np.uint8)
 
 fps = cap.get(cv2.CAP_PROP_FPS)
+print("FPS: ",fps)
+
+#loading the .npy file for the pen shape and color preserved values
+load_from_disk = True
+if load_from_disk:
+    penval = np.load('pen/penval.npy')
+
+
+kernel = np.ones((5, 5), np.uint8)
+
+canvas = None
+
+# Threshold for noise
+noiseth = 800
 
 # imgCanvas.fill(255)
 while True:
     start = time.time()
     # import image
-    success, img = cap.read()
-    img = cv2.flip(img, 1)
+    success, image = cap.read()
+    image = cv2.flip(image, 1)
     # find hand landmarks
-    img = detector.findHands(img)
+    img = detector.findHands(image)
     lmList = detector.findPosition(img, draw=False)
+
+
     if len(lmList) != 0:
         # print(lmList)
         # tip of index and middle fingers
@@ -53,16 +69,23 @@ while True:
         #center point of the tip
         x = (x0+x3)//2
         y = (y0+y3)//2
+        # x = x3
+        # y = y3
+        # x = x4
+        # y = y4
 
         #Calculate the distance of the thumb tip and index tip
         dis = math.sqrt(((x3-x0) ** 2) + ((y3-y0) ** 2))
+        print("Distance: ",dis)
 
         # check when fingers up
         fingers = detector.fingersUp()
         # selection mode - two fingers up
-        # condition = fingers[1] and fingers[2]
-        condition = False
-        condition2 = fingers[0] and fingers[1] and (dis < 200)
+        condition = fingers[1] and fingers[2]
+        # condition = False
+        condition2 = (dis < 60) and not fingers[2] and not fingers[3] and not fingers[4]
+        condition3 = fingers[0] and fingers[1] and fingers[2] and fingers[3] and fingers[4]
+        # condition4 = fingers[0] and not fingers[1] and not fingers[2] and not fingers[3] and not fingers[4]
 
         if condition:
             xp, yp = 0, 0
@@ -85,6 +108,11 @@ while True:
                     imgCanvas.fill(0)
             cv2.rectangle(img, (x1, y1 - 25), (x2, y2 + 25), drawColor, cv2.FILLED)
 
+        # if condition4:
+        #     header = overlayList[0]
+        #     drawColor = (0, 0, 255)
+        #     cv2.rectangle(img, (x1, y1 - 25), (x2, y2 + 25), drawColor, cv2.FILLED)
+
         # draw mode - index finger up
         if condition2:
             cv2.circle(img, (x, y), 15, drawColor, cv2.FILLED)
@@ -102,6 +130,17 @@ while True:
                 cv2.line(imgCanvas, (xp, yp), (x, y), drawColor, brushThickness)
             xp, yp = x, y
 
+        else:
+            xp = 0
+            yp = 0
+
+        if condition3:
+            imgCanvas.fill(0)
+            cv2.rectangle(img, (x1, y1 - 25), (x2, y2 + 25), drawColor, cv2.FILLED)
+
+        
+
+
     imgGray = cv2.cvtColor(imgCanvas, cv2.COLOR_BGR2GRAY)
     _, imgInv = cv2.threshold(imgGray, 50, 255, cv2.THRESH_BINARY_INV)
     imgInv = cv2.cvtColor(imgInv, cv2.COLOR_GRAY2BGR)
@@ -114,7 +153,8 @@ while True:
     cv2.imshow("Image", img)
     end = time.time()
     processing_time = end - start
-    delay = int((1000 / fps) - processing_time)
+    delay = int((1000 / fps) - processing_time) - 13
+    print("Delay: ",delay)
 
     if cv2.waitKey(delay) & 0xFF == ord('q'): # wait for the delay or until the user presses q
         break

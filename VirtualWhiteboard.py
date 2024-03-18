@@ -35,9 +35,9 @@ fps = cap.get(cv2.CAP_PROP_FPS)
 print("FPS: ",fps)
 
 #loading the .npy file for the pen shape and color preserved values
-load_from_disk = True
-if load_from_disk:
-    penval = np.load('pen/penval.npy')
+# load_from_disk = True
+# if load_from_disk:
+#     penval = np.load('pen/penval.npy')
 
 
 kernel = np.ones((5, 5), np.uint8)

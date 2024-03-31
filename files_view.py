@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (QApplication, QFileSystemModel, QPushButton,
                              QStyledItemDelegate, QTreeView, QVBoxLayout,
                              QWidget)
 
-from SmartPresentation import SmartPresentation
+from smart_presentation import SmartPresentation
 
 
 class FilesView(QWidget):

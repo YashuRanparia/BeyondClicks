@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (QAction, QApplication, QDesktopWidget,
                              QPushButton, QStackedWidget, QTextEdit,
                              QVBoxLayout, QWidget)
 
-from filesView import FilesView
+from FilesView import FilesView
 from VirtualWrittingBoard import VideoThread as vt
 from VirtualWrittingBoard import VWBView as vwb
 

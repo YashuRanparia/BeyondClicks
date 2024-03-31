@@ -21,6 +21,9 @@ log.basicConfig(level=log.INFO)
 logg = log.getLogger(__name__)
 
 
+from PyQt5.QtCore import QThread, QTimer, pyqtSignal
+
+
 class VideoThread(QThread):
 
     frame_signal = pyqtSignal(QPixmap)
@@ -58,7 +61,7 @@ class VideoThread(QThread):
                 img = detector.findHands(image)
                 lmList = detector.findPosition(img, draw=False)
 
-            if success and len(lmList) != 0:
+            if len(lmList) != 0:
                 x0, y0 = lmList[4][1:]  #thumb
                 x3, y3 = lmList[8][1:]  #Fore-finger
                 x1, y1 = lmList[8][1:]  #Fore-finger
@@ -128,7 +131,14 @@ class VideoThread(QThread):
                 # if condition3:
                 #     imgCanvas.fill(0)
                 #     cv2.rectangle(img, (x1, y1 - 25), (x2, y2 + 25), self.drawColor, cv2.FILLED)
-
+                    
+                self.buttonPressed = True
+                    
+            # if self.buttonPressed:
+            #     self.counter += 1
+            #     if self.counter > delay:
+            #         self.counter = 0
+            #         self.buttonPressed = False
 
             imgGray = cv2.cvtColor(imgCanvas, cv2.COLOR_BGR2GRAY)
             _, imgInv = cv2.threshold(imgGray, 50, 255, cv2.THRESH_BINARY_INV)
@@ -141,21 +151,31 @@ class VideoThread(QThread):
             image = Image.fromarray(np.asarray(rgbImage), mode='RGB')
             qt_img = ImageQt.ImageQt(image)
 
+            pixmap = QPixmap.fromImage(qt_img)
+
             end = time.time()
             processing_time = end - start
-            delay = int((1000 / fps) - processing_time) - 13
+            logg.info("Processing Time: " + str(processing_time))
+            if processing_time < (1000 / fps):
+                delay = int((1000 / fps) - processing_time) - 13
+                time.sleep(delay / 1000)
+                logg.info("Delay: " + str(delay))
 
-            logg.info("Delay: " + str(delay))
             
-            self.frame_signal.emit(QPixmap.fromImage(qt_img))
+            
+            self.frame_signal.emit(pixmap)
             # if cv2.waitKey(delay) & 0xFF == ord('q'): # wait for the delay or until the user presses q
             #     break
+    
+
                 
 
     def paramsInit(self):
         self.brushThickness = 15
         self.eraserThickness = 50
-
+        self.delay = 15
+        self.counter = 0
+        self.buttonPressed = False
         self.drawColor = (0, 0, 255)
 
 
@@ -194,7 +214,6 @@ class VWBView(QWidget):
     #Upgrade frames in View -> QLabel
     def upgrade_frame(self,pixmap):
         self.label.setPixmap(pixmap)
-        self.update()
         pass
 
     #Start thread for capturing visuals

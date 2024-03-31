@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 from cvzone.HandTrackingModule import HandDetector as htm
 from PIL import Image, ImageQt
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import (QApplication, QFileSystemModel, QHBoxLayout,
                              QLabel, QPushButton, QStyledItemDelegate,
@@ -28,9 +28,20 @@ class VideoThread(QThread):
 
     frame_signal = pyqtSignal(QPixmap)
 
+    def __init__(self):
+        super().__init__()
+
+        self.brushThickness = 15
+        self.eraserThickness = 50
+        self.delay = 15
+        self.counter = 0
+        self.buttonPressed = False
+        self.drawColor = (0, 0, 255)
+        pass
+
     def run(self):
 
-        self.paramsInit()
+        # self.paramsInit()
 
         cap = cv2.VideoCapture(0)
         cap.set(3, 1280)
@@ -61,7 +72,7 @@ class VideoThread(QThread):
                 img = detector.findHands(image)
                 lmList = detector.findPosition(img, draw=False)
 
-            if len(lmList) != 0:
+            if (len(lmList) != 0):
                 x0, y0 = lmList[4][1:]  #thumb
                 x3, y3 = lmList[8][1:]  #Fore-finger
                 x1, y1 = lmList[8][1:]  #Fore-finger
@@ -136,7 +147,7 @@ class VideoThread(QThread):
                     
             # if self.buttonPressed:
             #     self.counter += 1
-            #     if self.counter > delay:
+            #     if self.counter > self.delay:
             #         self.counter = 0
             #         self.buttonPressed = False
 
@@ -157,7 +168,7 @@ class VideoThread(QThread):
             processing_time = end - start
             logg.info("Processing Time: " + str(processing_time))
             if processing_time < (1000 / fps):
-                delay = int((1000 / fps) - processing_time) - 13
+                delay = int((1000 / fps) - processing_time)*0.1
                 time.sleep(delay / 1000)
                 logg.info("Delay: " + str(delay))
 
@@ -220,6 +231,7 @@ class VWBView(QWidget):
     def start(self):
         self.video = VideoThread()
         self.video.frame_signal.connect(self.upgrade_frame)
+        # self.video.frame_signal.connect(self.upgrade_frame, Qt.QueuedConnection)
         self.video.start()
 
     #Params Initialization

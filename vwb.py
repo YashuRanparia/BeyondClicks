@@ -35,32 +35,28 @@ class VideoThread(QThread):
         self.eraserThickness = 50
         self.delay = 15
         self.counter = 0
-        self.buttonPressed = False
         self.drawColor = (0, 0, 255)
         pass
 
     def run(self):
-
-        # self.paramsInit()
-        white_img = np.full((850,1450,3),(255,255,255), dtype=np.uint8)
+        log.info("run()")
+        white_img = np.full((720,1280,3),(255,255,255), dtype=np.uint8)
         self.vwb_img = cv2.cvtColor(white_img, cv2.COLOR_RGB2BGR)
-        
-        #Saving the image for debugging purpose <-----------------------------
-        if not os.path.exists("saved_image.jpg"):
-            filename = 'saved_image.jpg'
-            cv2.imwrite(filename, self.vwb_img)
-            imgsa = Image.open('saved_image.jpg')
-            imgsa.save('saved_image.jpg')
+    
 
         cap = cv2.VideoCapture(0)
         cap.set(3, 1280)
         cap.set(4, 720)
 
+        actual_width = cap.get(3)
+        actual_hight = cap.get(4)
+        log.info("Actual resolution: " + str(actual_width) + " x " + str(actual_hight))
+
         detector = htm.handDetector(detectionCon=0.85)
 
         xp, yp = 0, 0
         # imgCanvas = np.zeros((720, 1280, 3), np.uint8)
-        imgCanvas = np.full((850,1450,3),(255,255,255), dtype=np.uint8)
+        imgCanvas = np.full((720,1280,3),(255,255,255), dtype=np.uint8)
         # imgCanvas = cv2.cvtColor(imgCanvas, cv2.COLOR_RGB2BGR)
 
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -75,17 +71,24 @@ class VideoThread(QThread):
         ptr = 0
         while True:
             start = time.time()
-            success, image = cap.read()
+            success, self.image = cap.read()
             
-            self.vwb_img = np.full((850,1450,3),(255,255,255), dtype=np.uint8)
+            self.vwb_img = np.full((720,1280,3),(255,255,255), dtype=np.uint8)
             # self.vwb_img = cv2.cvtColor(white_img, cv2.COLOR_RGB2BGR)
-            log.info(ptr)
+            log.info("Frame: " + str(ptr+1))
             ++ptr
 
+            #Saving the first frame for debugging purpose <-----------------------------
+            if not os.path.exists("saved_image.jpg"):
+                filename = 'saved_image.jpg'
+                cv2.imwrite(filename, self.image)
+                imgsa = Image.open('saved_image.jpg')
+                imgsa.save('saved_image.jpg')
+
             if(success):
-                image = cv2.flip(image, 1)
-                camera_frame = image
-                img = detector.findHands(image)
+                self.image = cv2.flip(self.image, 1)
+                img = detector.findHands(self.image)
+                camera_frame = img
                 lmList = detector.findPosition(img, draw=False)
 
             if (len(lmList) != 0):
@@ -135,17 +138,17 @@ class VideoThread(QThread):
                 #     cv2.rectangle(img, (x1, y1 - 25), (x2, y2 + 25), self.drawColor, cv2.FILLED)
 
                 if condition2:
-                    cv2.circle(self.vwb_img, (x, y), 12, self.drawColor, cv2.FILLED)
+                    cv2.circle(img, (x, y), 12, self.drawColor, cv2.FILLED)
                     print("Drawing time")
                     if xp == 0 and yp == 0:
                         xp, yp = x, y
 
                     if self.drawColor == (0, 0, 0):
-                        cv2.line(self.vwb_img, (xp, yp), (x, y), self.drawColor, self.eraserThickness)
+                        cv2.line(img, (xp, yp), (x, y), self.drawColor, self.eraserThickness)
                         cv2.line(imgCanvas, (xp, yp), (x, y), self.drawColor, self.eraserThickness)
 
                     else:
-                        cv2.line(self.vwb_img, (xp, yp), (x, y), self.drawColor, self.brushThickness)
+                        cv2.line(img, (xp, yp), (x, y), self.drawColor, self.brushThickness)
                         cv2.line(imgCanvas, (xp, yp), (x, y), self.drawColor, self.brushThickness)
                     xp, yp = x, y
 
@@ -158,39 +161,28 @@ class VideoThread(QThread):
                 #     cv2.rectangle(img, (x1, y1 - 25), (x2, y2 + 25), self.drawColor, cv2.FILLED)
                     
                 self.buttonPressed = True
-                    
-            # if self.buttonPressed:
-            #     self.counter += 1
-            #     if self.counter > self.delay:
-            #         self.counter = 0
-            #         self.buttonPressed = False
-
-            # mask = cv2.cvtColor(imgCanvas, cv2.COLOR_BGR2GRAY)
-            # ret, mask = cv2.threshold(mask, 10, 255, cv2.THRESH_BINARY)
-            # self.vwb_img = cv2.bitwise_and(white_img, white_img, mask=mask)
-            # self.vwb_img = cv2.add(self.vwb_img, imgCanvas)
 
             imgGray = cv2.cvtColor(imgCanvas, cv2.COLOR_BGR2GRAY)
             _, imgInv = cv2.threshold(imgGray, 50, 255, cv2.THRESH_BINARY_INV)
             imgInv = cv2.cvtColor(imgInv, cv2.COLOR_GRAY2BGR)
-            print(self.vwb_img)
-            print(imgInv.shape)
-            self.vwb_img = cv2.bitwise_and(self.vwb_img, imgInv)
-            self.vwb_img = cv2.bitwise_or(self.vwb_img, imgCanvas)
+            img = cv2.bitwise_and(img, imgInv)
+            img = cv2.bitwise_or(img, imgCanvas)
 
-            cv2.imshow("Image", self.vwb_img)
-            vwb_rgbImage = cv2.cvtColor(self.vwb_img, cv2.COLOR_BGR2RGB)
+
+            vwb_rgbImage = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             image = Image.fromarray(np.asarray(vwb_rgbImage), mode='RGB')
             qt_img = ImageQt.ImageQt(image)
 
             vwb_frame = QPixmap.fromImage(qt_img)
 
+            cam_rgbImage = cv2.cvtColor(camera_frame, cv2.COLOR_BGR2RGB)
+            img2 = Image.fromarray(np.asarray(cam_rgbImage), mode='RGB')
+            qt_img2 = ImageQt.ImageQt(img2)
 
-            camera_rgbImage = cv2.cvtColor(camera_frame, cv2.COLOR_BGR2RGB)
-            image = Image.fromarray(np.asarray(camera_rgbImage), mode='RGB')
-            qt_img = ImageQt.ImageQt(image)
+            cam_frame = QPixmap.fromImage(qt_img2)
 
-            camera_frame = QPixmap.fromImage(qt_img)
+            # vwb_frame = self.to_Pixmap(img)
+            # camera_frame = self.toPixmap(camera_frame)
 
             end = time.time()
             processing_time = end - start
@@ -203,15 +195,20 @@ class VideoThread(QThread):
             
             frame_data = {
                 "vwb_frame": vwb_frame,
-                "camera_frame": camera_frame
+                "camera_frame": cam_frame
             }
 
             self.frame_signal.emit(frame_data)
-            # if cv2.waitKey(delay) & 0xFF == ord('q'): # wait for the delay or until the user presses q
-            #     break
-    
-
                 
+
+    def to_Pixmap(self, img):
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        im = Image.fromarray(np.asarray(img_rgb), mode='RGB')
+        qt_img = ImageQt.ImageQt(im)
+
+        pixmap = QPixmap.fromImage(qt_img)
+        return pixmap
+    
 
     def paramsInit(self):
         self.brushThickness = 15
@@ -233,22 +230,20 @@ class VWBView(QWidget):
 
 
     def initUI(self):
-        h = 720
-        w = 1280
+        h = 900
+        w = 1600
 
         self.setGeometry(80,50,w,h)
         # self.showMaximized()
         self.setWindowTitle("Virtual Writting Board")
 
         self.label = QLabel()
-        self.options = OptionsView()
         self.btn = QPushButton("Click Me", self)
 
         self.btn.clicked.connect(self.start)
 
         layout = QVBoxLayout()
         layout.addWidget(self.btn)
-        layout.addWidget(self.options)
         layout.addWidget(self.label)
 
         self.setLayout(layout)
@@ -265,7 +260,6 @@ class VWBView(QWidget):
     def start(self):
         self.video = VideoThread()
         self.video.frame_signal.connect(self.upgrade_frame)
-        # self.video.frame_signal.connect(self.upgrade_frame, Qt.QueuedConnection)
         self.video.start()
 
     #Params Initialization
@@ -277,31 +271,6 @@ class VWBView(QWidget):
 
     def setup(self):
         pass
-
-
-
-class OptionsView(QWidget):
-    def __init__(self):
-        super().__init__()
-
-        h = 200
-        w = 1500
-        self.setGeometry(20,20,w,h)
-
-        self.red_pen = QPushButton("Red")
-        self.blue_pen = QPushButton("Blue")
-        self.green_pen = QPushButton("Green")
-        self.eraser = QPushButton("Eraser")
-
-        layout =  QHBoxLayout()
-        layout.addWidget(self.red_pen)
-        layout.addWidget(self.blue_pen)
-        layout.addWidget(self.green_pen)
-        layout.addWidget(self.eraser)
-
-        self.setLayout(layout)
-        pass
-
 
 
 if __name__ == "__main__":

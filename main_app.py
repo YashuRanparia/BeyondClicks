@@ -19,6 +19,7 @@ from PyQt5.QtWidgets import (QAction, QApplication, QDesktopWidget,
 from files_view import FilesView
 from vwb import VideoThread as vt
 from vwb import VWBView as vwb
+from whiteboard_ui import WhiteBoardUI
 
 #Static sizes
 sizes = {}
@@ -117,7 +118,7 @@ class MainApp(QMainWindow):
         self.setCentralWidget(self.stacked_widget)
 
         self.page1 = MyWindow()
-        self.vwb = vwb()
+        self.vwb = WhiteBoardUI()
         # self.pres = PresentationScreen()
         self.fileView = FilesView("C:\\Users\\yashu\\Desktop\\SGP_4\\SGP4\\Test")
 

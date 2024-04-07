@@ -28,6 +28,7 @@ sizes["smartppt"] = (1000,40)
 
 #Defining my own window
 class MyWindow(QWidget):
+    
     def __init__(self):
         super().__init__()
         self.initUI()

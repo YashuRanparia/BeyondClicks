@@ -26,7 +26,7 @@ class SmartPresentation:
         pass
 
     def initPresentation(self, path):
-        self.Application = win32com.client.Dispatch("PowerPoint.Application" )
+        self.Application = win32com.client.Dispatch("PowerPoint.Application")
         self.Presentation = self.Application.Presentations.Open(path)
         print(self.Presentation.Name)
         self.Presentation.SlideShowSettings.Run()

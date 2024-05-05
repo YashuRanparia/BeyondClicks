@@ -1,24 +1,12 @@
 import os
 import sys
-import tkinter as tk
-from tkinter import filedialog
 
-import win32com.client
-from pptx import Presentation
-from pptx.util import Inches, Pt
-from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, pyqtSlot
-from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (QAction, QApplication, QDesktopWidget,
-                             QFileDialog, QGraphicsPixmapItem, QGraphicsScene,
-                             QGraphicsView, QLabel, QListWidget,
-                             QListWidgetItem, QMainWindow, QMenuBar,
+                             QFileDialog, QListWidget, QMainWindow,
                              QPushButton, QStackedWidget, QTextEdit,
                              QVBoxLayout, QWidget)
 
 from files_view import FilesView
-from vwb import VideoThread as vt
-from vwb import VWBView as vwb
 from whiteboard_ui import WhiteBoardUI
 
 #Static sizes
@@ -63,7 +51,7 @@ class MyWindow(QWidget):
         
         self.setLayout(layout)
 
-        #OnCLick button event: Select a folder
+    #OnCLick button event: Select a folder
     def find_files(self):
         folder_path = QFileDialog.getExistingDirectory(self, "Select a folder")
         if folder_path:
@@ -120,7 +108,6 @@ class MainApp(QMainWindow):
 
         self.page1 = MyWindow()
         self.vwb = WhiteBoardUI()
-        # self.pres = PresentationScreen()
         self.fileView = FilesView("C:\\Users\\yashu\\Desktop\\SGP_4\\SGP4\\Test")
 
         self.initUI()
@@ -170,6 +157,7 @@ class MainApp(QMainWindow):
     def show_about(self):
         self.text_widget.append("PLease click on the file to select the file and then select the file to give presentation.")
 
+    #Open Virtual Writting Board
     def openVWB(self):
         self.stacked_widget.addWidget(self.vwb)
         self.stacked_widget.setCurrentWidget(self.vwb)

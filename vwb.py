@@ -8,8 +8,8 @@ import cv2
 import numpy as np
 from cvzone.HandTrackingModule import HandDetector as htm
 from PIL import Image, ImageQt
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtCore import QObject, Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QCursor, QImage, QPixmap
 from PyQt5.QtWidgets import (QApplication, QFileSystemModel, QHBoxLayout,
                              QLabel, QPushButton, QStyledItemDelegate,
                              QTreeView, QVBoxLayout, QWidget)
@@ -26,20 +26,38 @@ from PyQt5.QtCore import QThread, QTimer, pyqtSignal
 
 class VideoThread(QThread):
 
-    frame_signal = pyqtSignal(QPixmap)
+    frame_signal = pyqtSignal(dict)
+
+    def __init__(self):
+        super().__init__()
+        self.stop_flag = False
+
+        self.brushThickness = 8
+        self.eraserThickness = 50
+        self.delay = 15
+        self.counter = 0
+        self.drawColor = (0, 0, 255)
+        self.cursor_x = 0
+        self.cursor_y = 0
+        pass
 
     def run(self):
-
-        self.paramsInit()
+        log.info("run()")
 
         cap = cv2.VideoCapture(0)
         cap.set(3, 1280)
         cap.set(4, 720)
 
+        actual_width = cap.get(3)
+        actual_hight = cap.get(4)
+        log.info("Actual resolution: " + str(actual_width) + " x " + str(actual_hight))
+
         detector = htm.handDetector(detectionCon=0.85)
 
         xp, yp = 0, 0
-        imgCanvas = np.zeros((720, 1280, 3), np.uint8)
+        # imgCanvas = np.zeros((720, 1280, 3), np.uint8)
+        imgCanvas = np.full((720,1280,3),(255,255,255), dtype=np.uint8)
+        # imgCanvas = cv2.cvtColor(imgCanvas, cv2.COLOR_RGB2BGR)
 
         fps = cap.get(cv2.CAP_PROP_FPS)
         print("FPS: ",fps)
@@ -50,29 +68,47 @@ class VideoThread(QThread):
 
         # Threshold for noise
         noiseth = 800
-
-        while True:
+        ptr = 0
+        while not self.stop_flag:
             start = time.time()
-            success, image = cap.read()
+            success, self.image = cap.read()
             
+            log.info("Frame: " + str(ptr+1))
+            ++ptr
+
+            #Saving the first frame for debugging purpose <-----------------------------
+            # if not os.path.exists("saved_image.jpg"):
+            #     filename = 'saved_image.jpg'
+            #     cv2.imwrite(filename, self.image)
+            #     imgsa = Image.open('saved_image.jpg')
+            #     imgsa.save('saved_image.jpg')
 
             if(success):
-                image = cv2.flip(image, 1)
-                img = detector.findHands(image)
+                self.image = cv2.flip(self.image, 1)
+                img = detector.findHands(self.image)
+                camera_frame = img
                 lmList = detector.findPosition(img, draw=False)
 
-            if len(lmList) != 0:
+            if (len(lmList) != 0):
                 x0, y0 = lmList[4][1:]  #thumb
-                x3, y3 = lmList[8][1:]  #Fore-finger
                 x1, y1 = lmList[8][1:]  #Fore-finger
                 x2, y2 = lmList[12][1:] #Middle-Finger
 
                 #center point of the tip
-                x = (x0+x3)//2
-                y = (y0+y3)//2
+                x = (x0+x1)//2
+                y = (y0+y1)//2
+
+                self.cursor_x = x + 10 + 10     #10 is added for screen padding provided by windows 
+                self.cursor_y = y + 50 + 20     #20 is added for upper space and titlebar
+
+                log.debug("Hand Coordinates: " + str(x) + " " + str(y))
+                log.debug("Cursor Coordinates: " + str(self.cursor_x) + " " + str(self.cursor_y))
+
+                #Move the cursor
+                QCursor.setPos(self.cursor_x, self.cursor_y)
 
                 #Calculate the distance of the thumb tip and index tip
-                dis = math.sqrt(((x3-x0) ** 2) + ((y3-y0) ** 2))
+                dis = math.sqrt(((x1-x0) ** 2) + ((y1-y0) ** 2))
                 print("Distance: ",dis)
 
                 # check when fingers up
@@ -87,34 +123,12 @@ class VideoThread(QThread):
                 #Clear board
                 condition3 = fingers[0] and fingers[1] and fingers[2] and fingers[3] and fingers[4]
 
-                # if condition:
-                #     xp, yp = 0, 0
-                #     print("Selection time")
-
-                #     if y1 < 115:
-                #         if 250 < x1 < 400:
-                #             self.header = self.overlayList[0]
-                #             self.drawColor = (0, 0, 255)
-                #         elif 470 < x1 < 640:
-                #             self.header = self.overlayList[1]
-                #             self.drawColor = (255, 0, 0)
-                #         elif 690 < x1 < 845:
-                #             self.header = self.overlayList[2]
-                #             self.drawColor = (0, 255, 0)
-                #         elif 880 < x1 < 1050:
-                #             self.header = self.overlayList[3]
-                #             self.drawColor = (0, 0, 0)
-                #         elif 1080 < x1 < 1280:
-                #             imgCanvas.fill(0)
-                #     cv2.rectangle(img, (x1, y1 - 25), (x2, y2 + 25), self.drawColor, cv2.FILLED)
-
                 if condition2:
-                    cv2.circle(img, (x, y), 15, self.drawColor, cv2.FILLED)
+                    cv2.circle(img, (x, y), 12, self.drawColor, cv2.FILLED)
                     print("Drawing time")
                     if xp == 0 and yp == 0:
                         xp, yp = x, y
 
-                    # cv2.line(img, (xp,xp), (x1,y1), self.drawColor, brushThickness)
                     if self.drawColor == (0, 0, 0):
                         cv2.line(img, (xp, yp), (x, y), self.drawColor, self.eraserThickness)
                         cv2.line(imgCanvas, (xp, yp), (x, y), self.drawColor, self.eraserThickness)
@@ -128,17 +142,12 @@ class VideoThread(QThread):
                     xp = 0
                     yp = 0
 
-                # if condition3:
-                #     imgCanvas.fill(0)
-                #     cv2.rectangle(img, (x1, y1 - 25), (x2, y2 + 25), self.drawColor, cv2.FILLED)
+                if condition3:
+                    # imgCanvas.fill(0)
+                    # cv2.rectangle(img, (x1, y1 - 25), (x2, y2 + 25), self.drawColor, cv2.FILLED)
+                    imgCanvas = np.full((720,1280,3),(255,255,255), dtype=np.uint8)
                     
                 self.buttonPressed = True
-                    
-            # if self.buttonPressed:
-            #     self.counter += 1
-            #     if self.counter > delay:
-            #         self.counter = 0
-            #         self.buttonPressed = False
 
             imgGray = cv2.cvtColor(imgCanvas, cv2.COLOR_BGR2GRAY)
             _, imgInv = cv2.threshold(imgGray, 50, 255, cv2.THRESH_BINARY_INV)
@@ -146,29 +155,66 @@ class VideoThread(QThread):
             img = cv2.bitwise_and(img, imgInv)
             img = cv2.bitwise_or(img, imgCanvas)
 
-            # cv2.imshow("Image", img)
-            rgbImage = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            image = Image.fromarray(np.asarray(rgbImage), mode='RGB')
+            #-----------cv2 img to pixmap---------------------------------------
+            vwb_rgbImage = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            image = Image.fromarray(np.asarray(vwb_rgbImage), mode='RGB')
             qt_img = ImageQt.ImageQt(image)
+            vwb_frame = QPixmap.fromImage(qt_img)
 
-            pixmap = QPixmap.fromImage(qt_img)
+            cam_rgbImage = cv2.cvtColor(camera_frame, cv2.COLOR_BGR2RGB)
+            img2 = Image.fromarray(np.asarray(cam_rgbImage), mode='RGB')
+            qt_img2 = ImageQt.ImageQt(img2)
+            cam_frame = QPixmap.fromImage(qt_img2)
+
+            # vwb_frame = self.to_Pixmap(img)
+            # camera_frame = self.toPixmap(camera_frame)
 
             end = time.time()
             processing_time = end - start
             logg.info("Processing Time: " + str(processing_time))
             if processing_time < (1000 / fps):
-                delay = int((1000 / fps) - processing_time) - 13
+                delay = int((1000 / fps) - processing_time) - 10
                 time.sleep(delay / 1000)
                 logg.info("Delay: " + str(delay))
 
             
-            
-            self.frame_signal.emit(pixmap)
-            # if cv2.waitKey(delay) & 0xFF == ord('q'): # wait for the delay or until the user presses q
-            #     break
-    
+            frame_data = {
+                "vwb_frame": vwb_frame,
+                "camera_frame": cam_frame,
+                "cursor": (self.cursor_x,self.cursor_y)
+            }
 
-                
+            self.frame_signal.emit(frame_data)
+            pass
+        cap.release()
+        pass
+
+
+    def stop(self):
+        self.stop_flag = True
+        pass
+
+    def get_cursor_coordinates(self):
+        global_cursor_pos = QCursor.pos()
+        widget_cursor_pos = QWidget.mapFromGlobal(global_cursor_pos)
+
+        # Access x and y coordinates
+        x, y = widget_cursor_pos.x(), widget_cursor_pos.y()
+        print(f"Cursor position (widget coordinates): ({x}, {y})")
+        pass
+
+    def set_cursor_coordinates(self):
+        QCursor.setPos(self.cursor_x, self.cursor_y)
+        pass
+
+    def to_Pixmap(self, img):
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        im = Image.fromarray(np.asarray(img_rgb), mode='RGB')
+        qt_img = ImageQt.ImageQt(im)
+
+        pixmap = QPixmap.fromImage(qt_img)
+        return pixmap
+    
 
     def paramsInit(self):
         self.brushThickness = 15
@@ -179,6 +225,7 @@ class VideoThread(QThread):
         self.drawColor = (0, 0, 255)
 
 
+#For Testing Purpose only!
 class VWBView(QWidget):
     
     def __init__(self):
@@ -190,30 +237,30 @@ class VWBView(QWidget):
 
 
     def initUI(self):
-        h = 720
-        w = 1280
+        h = 900
+        w = 1600
 
         self.setGeometry(80,50,w,h)
         # self.showMaximized()
         self.setWindowTitle("Virtual Writting Board")
 
         self.label = QLabel()
-        self.options = OptionsView()
         self.btn = QPushButton("Click Me", self)
 
         self.btn.clicked.connect(self.start)
 
         layout = QVBoxLayout()
         layout.addWidget(self.btn)
-        layout.addWidget(self.options)
         layout.addWidget(self.label)
 
         self.setLayout(layout)
         pass
 
     #Upgrade frames in View -> QLabel
-    def upgrade_frame(self,pixmap):
-        self.label.setPixmap(pixmap)
+    def upgrade_frame(self,frame_data):
+        log.info("Upgrading frame.....")
+        self.label.setPixmap(frame_data["vwb_frame"])
+        log.info("Frame Upgraded!")
         pass
 
     #Start thread for capturing visuals
@@ -231,31 +278,6 @@ class VWBView(QWidget):
 
     def setup(self):
         pass
-
-
-
-class OptionsView(QWidget):
-    def __init__(self):
-        super().__init__()
-
-        h = 200
-        w = 1500
-        self.setGeometry(20,20,w,h)
-
-        self.red_pen = QPushButton("Red")
-        self.blue_pen = QPushButton("Blue")
-        self.green_pen = QPushButton("Green")
-        self.eraser = QPushButton("Eraser")
-
-        layout =  QHBoxLayout()
-        layout.addWidget(self.red_pen)
-        layout.addWidget(self.blue_pen)
-        layout.addWidget(self.green_pen)
-        layout.addWidget(self.eraser)
-
-        self.setLayout(layout)
-        pass
-
 
 
 if __name__ == "__main__":

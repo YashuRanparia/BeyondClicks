@@ -1,24 +1,13 @@
 import os
 import sys
-import tkinter as tk
-from tkinter import filedialog
 
-import win32com.client
-from pptx import Presentation
-from pptx.util import Inches, Pt
-from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, pyqtSlot
-from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (QAction, QApplication, QDesktopWidget,
-                             QFileDialog, QGraphicsPixmapItem, QGraphicsScene,
-                             QGraphicsView, QLabel, QListWidget,
-                             QListWidgetItem, QMainWindow, QMenuBar,
+                             QFileDialog, QListWidget, QMainWindow,
                              QPushButton, QStackedWidget, QTextEdit,
                              QVBoxLayout, QWidget)
 
 from files_view import FilesView
-from vwb import VideoThread as vt
-from vwb import VWBView as vwb
+from whiteboard_ui import WhiteBoardUI
 
 #Static sizes
 sizes = {}
@@ -27,6 +16,7 @@ sizes["smartppt"] = (1000,40)
 
 #Defining my own window
 class MyWindow(QWidget):
+    
     def __init__(self):
         super().__init__()
         self.initUI()
@@ -61,7 +51,7 @@ class MyWindow(QWidget):
         
         self.setLayout(layout)
 
-        #OnCLick button event: Select a folder
+    #OnCLick button event: Select a folder
     def find_files(self):
         folder_path = QFileDialog.getExistingDirectory(self, "Select a folder")
         if folder_path:
@@ -92,62 +82,6 @@ class MyWindow(QWidget):
     
 
 
-class PresentationScreen(QWidget):
-    
-    def __init__(self):
-        super().__init__()
-        pptx_file_path = "Speed of COVID-19 Vaccine Development.pptx"
-        self.presentation = Presentation(pptx_file_path)
-        self.current_slide_index = 0
-        print(len(self.presentation.slides))
-        self.setup_ui()
-
-    def setup_ui(self):
-        layout = QVBoxLayout()
-
-        # Display the current slide's content
-        self.slide_view = QGraphicsView()
-        layout.addWidget(self.slide_view)
-
-        # Next Slide button
-        next_button = QPushButton("Next Slide")
-        next_button.clicked.connect(self.show_next_slide)
-        layout.addWidget(next_button)
-
-        self.setLayout(layout)
-        self.show_current_slide()
-
-    def show_current_slide(self):
-        current_slide = self.presentation.slides[self.current_slide_index]
-        slide_image = self.get_slide_image(current_slide)
-        self.slide_view.setScene(slide_image)
-
-    def render_slide(self, slide):
-        scene = QGraphicsScene()
-        pixmap_item = QGraphicsPixmapItem(self.get_slide_image(slide))
-        scene.addItem(pixmap_item)
-        return scene
-
-    def get_slide_image(self, slide):
-        # Calculate slide dimensions (adjust as needed)
-        slide_width = Inches(6.5)
-        slide_height = Inches(4.5)
-
-        # Extract the slide image (first shape with an image)
-        for shape in slide.shapes:
-            if shape.shape_type == 13:  # Shape type for images
-                image_stream = shape.image.blob
-                pixmap = QPixmap()
-                pixmap.loadFromData(image_stream)
-                pixmap = pixmap.scaled(slide_width, slide_height, aspectMode=Qt.KeepAspectRatio, transformMode=Qt.SmoothTransformation)
-                scene = QGraphicsScene()
-                scene.addPixmap(pixmap)
-                return scene
-
-    def show_next_slide(self):
-        self.current_slide_index = (self.current_slide_index + 1) % len(self.presentation.slides)
-        self.show_current_slide()
-
 #Finding the .pptx files from the directories
 def find_pptx_files(directory):
     pptx_files = []
@@ -173,7 +107,7 @@ class MainApp(QMainWindow):
         self.setCentralWidget(self.stacked_widget)
 
         self.page1 = MyWindow()
-        # self.pres = PresentationScreen()
+        self.vwb = WhiteBoardUI()
         self.fileView = FilesView("C:\\Users\\yashu\\Desktop\\SGP_4\\SGP4\\Test")
 
         self.initUI()
@@ -223,16 +157,10 @@ class MainApp(QMainWindow):
     def show_about(self):
         self.text_widget.append("PLease click on the file to select the file and then select the file to give presentation.")
 
+    #Open Virtual Writting Board
     def openVWB(self):
-        # self.showMinimized()
-
-        vi = vwb()
-
-        self.stacked_widget.addWidget(vi)
-        self.stacked_widget.setCurrentWidget(vi)
-        vi.start()
-
-        # self.show(obj)
+        self.stacked_widget.addWidget(self.vwb)
+        self.stacked_widget.setCurrentWidget(self.vwb)
         pass
 
     #Presentation

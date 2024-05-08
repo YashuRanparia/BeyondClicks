@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (QAction, QApplication, QDesktopWidget,
                              QVBoxLayout, QWidget)
 
 from files_view import FilesView
-from whiteboard_ui import WhiteBoardUI
+from whiteboard_ui import WhiteBoard, WhiteBoardUI
 
 #Static sizes
 sizes = {}

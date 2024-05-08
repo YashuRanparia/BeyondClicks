@@ -28,13 +28,19 @@ class VideoThread(QThread):
 
     frame_signal = pyqtSignal(dict)
 
-    def __init__(self):
+    def __init__(self,mode):
         super().__init__()
+        self.mode = mode
         self.stop_flag = False
-
+        self.slide_num = 1
         self.brushThickness = 8
         self.eraserThickness = 50
-        self.delay = 15
+        if(self.mode == 0):
+            self.delay = 250
+            pass
+        else:
+            self.delay = 15
+            pass
         self.counter = 0
         self.drawColor = (0, 0, 255)
         self.cursor_x = 0
@@ -149,6 +155,34 @@ class VideoThread(QThread):
                     
                 self.buttonPressed = True
 
+            if self.mode == 0:
+                #condition for next
+                self.condition_next = not fingers[0] and fingers[1] and not fingers[2] and not fingers[3] and not fingers[4]
+
+                #condition for previous
+                self.condition_prev = fingers[0] and not fingers[1] and not fingers[2] and not fingers[3] and not fingers[4]
+
+                #condition for close
+                self.condition_close = fingers[0] and fingers[1] and fingers[2] and fingers[3] and fingers[4]
+
+                #condition for Presentation
+                if self.condition_next:
+                    print("Next")
+                    self.buttonPressed = True
+                    if self.slide_num > 0 and self.slide_num < 10:
+                        self.slide_num = self.slide_num + 1
+                        pass
+                elif self.condition_prev:
+                    print("Previous")
+                    self.buttonPressed = True
+                    if self.slide_num > 1:
+                        self.slide_num = self.slide_num - 1
+                        pass
+                elif self.condition_close:
+                    # self.close()
+                    self.stop_flag = True
+                    break
+
             imgGray = cv2.cvtColor(imgCanvas, cv2.COLOR_BGR2GRAY)
             _, imgInv = cv2.threshold(imgGray, 50, 255, cv2.THRESH_BINARY_INV)
             imgInv = cv2.cvtColor(imgInv, cv2.COLOR_GRAY2BGR)
@@ -172,15 +206,20 @@ class VideoThread(QThread):
             end = time.time()
             processing_time = end - start
             logg.info("Processing Time: " + str(processing_time))
-            if processing_time < (1000 / fps):
+            if processing_time < (1000 / fps) and self.mode == 1:
                 delay = int((1000 / fps) - processing_time) - 10
                 time.sleep(delay / 1000)
                 logg.info("Delay: " + str(delay))
+                pass
+            elif self.mode == 0:
+                time.sleep(1)
+                pass
 
             
             frame_data = {
                 "vwb_frame": vwb_frame,
                 "camera_frame": cam_frame,
+                "slide_num": self.slide_num,
                 "cursor": (self.cursor_x,self.cursor_y)
             }
 

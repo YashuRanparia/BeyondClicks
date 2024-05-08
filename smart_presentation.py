@@ -2,16 +2,14 @@ import logging as log
 import os
 import sys
 
-import aspose.pydrawing as drawing
-import aspose.slides as slides
 import cv2
 import numpy as np
 import win32com.client
 from cvzone.HandTrackingModule import HandDetector as htm
 from fitz import fitz
 from PIL import Image, ImageQt
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import QObject, QSize, Qt, QThread, QTimer, pyqtSignal
+from PyQt5 import QtWidgets
+from PyQt5.QtCore import QSize, Qt, QThread, QTimer, pyqtSignal
 from PyQt5.QtGui import QCursor, QImage, QPixmap
 from PyQt5.QtWidgets import (QAction, QApplication, QDesktopWidget,
                              QFileDialog, QLabel, QListWidget, QMainWindow,
@@ -42,24 +40,14 @@ class SmartPresentation:
     def saveSlides(self,pdf_path):
         output_format = 18  # 17 corresponds to PNG format
 
-        # pdf_path = "presentation.pdf"
-        # presentation.SaveAs(pdf_path, FileFormat=32)
-
         pdf_doc = fitz.open(pdf_path)
 
         for page_num in range(len(pdf_doc)):  # Loop through each page (slide)
             page = pdf_doc[page_num]
             zoom = 2
             slide_image = page.get_pixmap(matrix=fitz.Matrix(zoom,zoom))  # Extract the page image
-            slide_image.save(f"slide_{page_num + 1}.png")
-
-        # for slide in presentation.Slides:
-        #     print(type(slide))
-        #     # Specify the path and filename for the output image
-        #     image_path = f"slide_{slide.SlideIndex}.pdf"
-        
-        #     # Save the slide as an image using the chosen format
-        #     slide.Export(image_path, "JPG")
+            slide_path = f"slide_{page_num + 1}.png"
+            slide_image.save(slide_path)
         pass
 
     def initPresentation(self, path):
@@ -75,6 +63,18 @@ class SmartPresentation:
 
         self.setup()
         self.start()
+
+    def pptSetup(self,path):
+        self.Application = win32com.client.Dispatch("PowerPoint.Application")
+        self.Presentation = self.Application.Presentations.Open(path)
+        print(self.Presentation.Name)
+
+        pdf_path = "C:\\Users\\yashu\\Desktop\\FFE_Mentorship_Program\\Session_1\\presen1.pdf"
+        self.Presentation.SaveAs(pdf_path, FileFormat=32)
+
+        self.saveSlides(pdf_path)
+        log.info("File saved as PDF.")
+        pass
 
 
     def setup(self):
@@ -227,6 +227,80 @@ class sp(QWidget):
         # return qpixmap
     pass
 
+class PresentationThread(QThread):
+    frame_signal = pyqtSignal(dict)
+    def __init__(self) -> None:
+        super().__init__()
+        self.slide_num = 1
+        self.stop_flag = False
+        pass
+
+    def run(self):
+        print("Started")
+        #camera must be ready
+        cap = cv2.VideoCapture(0)
+        cap.set(3, 1080)
+        cap.set(4, 720)
+        print("Camera Setup Done Successfully!")
+
+        while not self.stop_flag:
+            success, image = cap.read()
+            imgCurrent = image.copy()
+            image = cv2.flip(image, 1)
+            hands, img = self.detector.findHands(image)
+
+            if(hands and self.buttonPressed is False):
+                hand = hands[0]
+                lmList = hand["lmList"]
+                fingers = self.detector.fingersUp(hand)
+
+                #condition for next
+                condition_next = not fingers[0] and fingers[1] and not fingers[2] and not fingers[3] and not fingers[4]
+
+                #condition for previous
+                condition_prev = fingers[0] and not fingers[1] and not fingers[2] and not fingers[3] and not fingers[4]
+
+                #condition for close
+                condition_close = fingers[0] and fingers[1] and fingers[2] and fingers[3] and fingers[4]
+
+                if(condition_next):
+                    print("Next")
+                    self.buttonPressed = True
+                    if self.slide_num > 0 and self.slide_num < 10:
+                        self.slide_num = self.slide_num + 1
+                        pass
+                elif(condition_prev):
+                    print("Previous")
+                    self.buttonPressed = True
+                    if self.slide_num > 1:
+                        self.slide_num = self.slide_num - 1
+                        pass
+                elif(condition_close):
+                    # self.close()
+                    self.stop_flag = True
+                    break
+
+                self.buttonPressed = True
+
+            if self.buttonPressed:
+                self.counter += 1
+                if self.counter > self.delay:
+                    self.counter = 0
+                    self.buttonPressed = False
+ 
+            # cv2.imshow("Image", img)
+ 
+            # key = cv2.waitKey(1)
+            # if key == ord('q'):
+            #     break
+            frame_data = {
+                "slide_num": self.slide_num,
+            }
+
+            self.frame_signal.emit(frame_data)
+        pass
+        cap.release()
+    pass
 
 if __name__ == "__main__":
     

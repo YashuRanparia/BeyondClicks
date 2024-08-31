@@ -1,13 +1,12 @@
 import logging as log
 import sys
 import threading
+import time
 
-import aspose.pydrawing as drawing
-import aspose.slides as slides
 import cv2
 import numpy as np
+import pymupdf
 import win32com.client
-from fitz import fitz
 from PIL import Image, ImageQt
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QObject, QSize, Qt, QThread, QTimer, pyqtSignal
@@ -17,7 +16,7 @@ from PyQt5.QtWidgets import (QApplication, QFileSystemModel, QHBoxLayout,
                              QStyledItemDelegate, QTreeView, QVBoxLayout,
                              QWidget)
 
-from smart_presentation import PresentationThread
+# from smart_presentation import PresentationThread
 from vwb import VideoThread
 
 log.basicConfig(level=log.INFO)
@@ -234,15 +233,15 @@ class WhiteBoardUI(QWidget):
     def saveSlides(self,pdf_path):
         output_format = 18  # 17 corresponds to PNG format
 
-        pdf_doc = fitz.open(pdf_path)
+        pdf_doc = pymupdf.open(pdf_path)
         self.total_slides = 0
 
         for page_num in range(len(pdf_doc)):  # Loop through each page (slide)
             self.total_slides = self.total_slides + 1
             page = pdf_doc[page_num]
             zoom = 2
-            slide_image = page.get_pixmap(matrix=fitz.Matrix(zoom,zoom))  # Extract the page image
-            slide_path = f"slide_{page_num + 1}.png"
+            slide_image = page.get_pixmap(matrix=pymupdf.Matrix(zoom,zoom))  # Extract the page image
+            slide_path = f"cache/slide_{page_num + 1}.png"
             slide_image.save(slide_path)
         pass
 
@@ -251,7 +250,7 @@ class WhiteBoardUI(QWidget):
         self.Presentation = self.Application.Presentations.Open(path)
         print(self.Presentation.Name)
 
-        pdf_path = "C:\\Users\\yashu\\Desktop\\FFE_Mentorship_Program\\Session_1\\presen1.pdf"
+        pdf_path = "./cache/presen1.pdf"
         self.Presentation.SaveAs(pdf_path, FileFormat=32)
 
         self.saveSlides(pdf_path)
@@ -260,7 +259,7 @@ class WhiteBoardUI(QWidget):
 
     def ppts(self,path):
         self.pptSetup(path)
-
+        time.sleep(5)
         self.vwb = VideoThread(0)
         self.vwb.frame_signal.connect(self.upgrade_slides)
         self.vwb.start()
@@ -269,7 +268,7 @@ class WhiteBoardUI(QWidget):
 
     def upgrade_slides(self,frame_data):
         slide_num = frame_data["slide_num"]
-        slide_pixmap = self.presenter(f"slide_{slide_num}.png")
+        slide_pixmap = self.presenter(f"cache/slide_{slide_num}.png")
 
         self.whiteboard.setPixmap(slide_pixmap)
         log.info("slide is on board")

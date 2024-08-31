@@ -1,10 +1,8 @@
-import subprocess
 import sys
 
-from PyQt5.QtCore import QModelIndex, QRect, QSize
-from PyQt5.QtWidgets import (QApplication, QFileSystemModel, QPushButton,
-                             QStackedWidget, QStyledItemDelegate, QTreeView,
-                             QVBoxLayout, QWidget)
+from PyQt5.QtCore import QModelIndex
+from PyQt5.QtWidgets import (QApplication, QFileSystemModel, QStackedWidget,
+                             QTreeView, QVBoxLayout, QWidget)
 
 from smart_presentation import SmartPresentation
 from whiteboard_ui import WhiteBoardUI

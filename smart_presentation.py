@@ -4,9 +4,9 @@ import sys
 
 import cv2
 import numpy as np
+import pymupdf
 import win32com.client
 from cvzone.HandTrackingModule import HandDetector as htm
-from fitz import fitz
 from PIL import Image, ImageQt
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QSize, Qt, QThread, QTimer, pyqtSignal
@@ -40,12 +40,12 @@ class SmartPresentation:
     def saveSlides(self,pdf_path):
         output_format = 18  # 17 corresponds to PNG format
 
-        pdf_doc = fitz.open(pdf_path)
+        pdf_doc = pymupdf.open(pdf_path)
 
         for page_num in range(len(pdf_doc)):  # Loop through each page (slide)
             page = pdf_doc[page_num]
             zoom = 2
-            slide_image = page.get_pixmap(matrix=fitz.Matrix(zoom,zoom))  # Extract the page image
+            slide_image = page.get_pixmap(matrix=pymupdf.Matrix(zoom,zoom))  # Extract the page image
             slide_path = f"slide_{page_num + 1}.png"
             slide_image.save(slide_path)
         pass

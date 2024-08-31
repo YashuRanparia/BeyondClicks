@@ -35,12 +35,9 @@ class VideoThread(QThread):
         self.slide_num = 1
         self.brushThickness = 8
         self.eraserThickness = 50
+        self.delay = 15
         if(self.mode == 0):
-            self.delay = 250
-            pass
-        else:
-            self.delay = 15
-            pass
+            self.delay = 100
         self.counter = 0
         self.drawColor = (0, 0, 255)
         self.cursor_x = 0
@@ -48,6 +45,23 @@ class VideoThread(QThread):
         pass
 
     def run(self):
+        def to_Pixmap(img):
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            im = Image.fromarray(np.asarray(img_rgb), mode='RGB')
+            np_image = np.array(im)
+            qt_img = None
+            if np_image.dtype == np.uint8:
+                # If the array is already uint8, use it directly
+                qt_img = QImage(np_image.data, np_image.shape[1], np_image.shape[0], QImage.Format_RGB888)
+            else:
+                # If the array is not uint8, convert it to uint8
+                np_image = np_image.astype(np.uint8)
+                qt_img = QImage(np_image.data, np_image.shape[1], np_image.shape[0], QImage.Format_RGB888)
+            # qt_img = ImageQt.ImageQt(im)
+
+            pixmap = QPixmap.fromImage(qt_img)
+            return pixmap
+        
         log.info("run()")
 
         cap = cv2.VideoCapture(0)
@@ -155,33 +169,32 @@ class VideoThread(QThread):
                     
                 self.buttonPressed = True
 
-            if self.mode == 0:
-                #condition for next
-                self.condition_next = not fingers[0] and fingers[1] and not fingers[2] and not fingers[3] and not fingers[4]
+                self.condition_next = fingers[0] and fingers[1] and fingers[2] and fingers[3] and fingers[4]
 
                 #condition for previous
                 self.condition_prev = fingers[0] and not fingers[1] and not fingers[2] and not fingers[3] and not fingers[4]
 
                 #condition for close
-                self.condition_close = fingers[0] and fingers[1] and fingers[2] and fingers[3] and fingers[4]
+                self.condition_close = not fingers[0] and not fingers[1] and not fingers[2] and fingers[3] and fingers[4]
 
                 #condition for Presentation
-                if self.condition_next:
+                if self.condition_next and self.mode == 0:
                     print("Next")
                     self.buttonPressed = True
                     if self.slide_num > 0 and self.slide_num < 10:
                         self.slide_num = self.slide_num + 1
                         pass
-                elif self.condition_prev:
+                elif self.condition_prev and self.mode == 0:
                     print("Previous")
                     self.buttonPressed = True
                     if self.slide_num > 1:
                         self.slide_num = self.slide_num - 1
                         pass
-                elif self.condition_close:
+                elif self.condition_close and self.mode == 0:
                     # self.close()
                     self.stop_flag = True
                     break
+    
 
             imgGray = cv2.cvtColor(imgCanvas, cv2.COLOR_BGR2GRAY)
             _, imgInv = cv2.threshold(imgGray, 50, 255, cv2.THRESH_BINARY_INV)
@@ -190,19 +203,12 @@ class VideoThread(QThread):
             img = cv2.bitwise_or(img, imgCanvas)
 
             #-----------cv2 img to pixmap---------------------------------------
-            vwb_rgbImage = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            image = Image.fromarray(np.asarray(vwb_rgbImage), mode='RGB')
-            qt_img = ImageQt.ImageQt(image)
-            vwb_frame = QPixmap.fromImage(qt_img)
 
-            cam_rgbImage = cv2.cvtColor(camera_frame, cv2.COLOR_BGR2RGB)
-            img2 = Image.fromarray(np.asarray(cam_rgbImage), mode='RGB')
-            qt_img2 = ImageQt.ImageQt(img2)
-            cam_frame = QPixmap.fromImage(qt_img2)
+            vwb_frame = to_Pixmap(img)
+            camera_frame = to_Pixmap(camera_frame)
 
-            # vwb_frame = self.to_Pixmap(img)
-            # camera_frame = self.toPixmap(camera_frame)
 
+            #-----------Calculating processing time and provide delay---------------------------------------
             end = time.time()
             processing_time = end - start
             logg.info("Processing Time: " + str(processing_time))
@@ -216,9 +222,10 @@ class VideoThread(QThread):
                 pass
 
             
+            #-----------Frame to be emitted---------------------------------------
             frame_data = {
                 "vwb_frame": vwb_frame,
-                "camera_frame": cam_frame,
+                "camera_frame": camera_frame,
                 "slide_num": self.slide_num,
                 "cursor": (self.cursor_x,self.cursor_y)
             }
@@ -246,13 +253,6 @@ class VideoThread(QThread):
         QCursor.setPos(self.cursor_x, self.cursor_y)
         pass
 
-    def to_Pixmap(self, img):
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        im = Image.fromarray(np.asarray(img_rgb), mode='RGB')
-        qt_img = ImageQt.ImageQt(im)
-
-        pixmap = QPixmap.fromImage(qt_img)
-        return pixmap
     
 
     def paramsInit(self):

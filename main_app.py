@@ -108,7 +108,7 @@ class MainApp(QMainWindow):
 
         self.page1 = MyWindow()
         self.vwb = WhiteBoardUI()
-        self.fileView = FilesView("C:\\Users\\yashu\\Desktop\\SGP_4\\SGP4\\Test")
+        self.fileView = FilesView("./Test")
 
         self.initUI()
         pass
@@ -116,7 +116,7 @@ class MainApp(QMainWindow):
 
     def initUI(self):
         self.createMenubar()
-        self.stacked_widget.addWidget(self.fileView)
+        self.stacked_widget.addWidget(self.fileView)    #index - 0
         pass
 
     #Menubar
@@ -160,17 +160,12 @@ class MainApp(QMainWindow):
     #Open Virtual Writting Board
     def openVWB(self):
         self.stacked_widget.addWidget(self.vwb)
-        self.stacked_widget.setCurrentWidget(self.vwb)
+        self.stacked_widget.setCurrentWidget(self.vwb)  #index - 1
         pass
 
     #Presentation
     def show_presentation(self):
         pass
-
-    #Slides
-    def switch_to_slide(self, slide_number):
-        # Show the specified slide
-        self.stacked_widget.setCurrentIndex(slide_number - 1)
 
 def onclick():
     print("Finding files.......")
@@ -179,7 +174,7 @@ def onclick():
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    dirPath = 'C:\\Users\\yashu\\Desktop\\SGP_4\\SGP4\\Test'
+    dirPath = './Test'
     win = MainApp()
     win.show()
     sys.exit(app.exec_())

@@ -1,9 +1,13 @@
 import logging as log
 import sys
 import threading
+import time
 
 import cv2
 import numpy as np
+import pymupdf
+import win32com.client
+from PIL import Image, ImageQt
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QObject, QSize, Qt, QThread, QTimer, pyqtSignal
 from PyQt5.QtGui import QCursor, QImage, QPixmap
@@ -12,6 +16,7 @@ from PyQt5.QtWidgets import (QApplication, QFileSystemModel, QHBoxLayout,
                              QStyledItemDelegate, QTreeView, QVBoxLayout,
                              QWidget)
 
+# from smart_presentation import PresentationThread
 from vwb import VideoThread
 
 log.basicConfig(level=log.INFO)
@@ -77,6 +82,7 @@ class WhiteBoardUI(QWidget):
         font = QtGui.QFont()
         font.setPointSize(16)
         self.Red.setFont(font)
+        self.Red.clicked.connect(self.changePenColor)
         self.Red.setObjectName("Red")
 
         self.Green = QtWidgets.QPushButton(self)
@@ -84,6 +90,7 @@ class WhiteBoardUI(QWidget):
         font = QtGui.QFont()
         font.setPointSize(16)
         self.Green.setFont(font)
+        self.Green.clicked.connect(self.changePenColor)
         self.Green.setObjectName("Green")
 
         self.Blue = QtWidgets.QPushButton(self)
@@ -91,6 +98,7 @@ class WhiteBoardUI(QWidget):
         font = QtGui.QFont()
         font.setPointSize(16)
         self.Blue.setFont(font)
+        self.Blue.clicked.connect(self.changePenColor)
         self.Blue.setObjectName("Blue")
 
         self.Eraser = QtWidgets.QPushButton(self)
@@ -98,6 +106,7 @@ class WhiteBoardUI(QWidget):
         font = QtGui.QFont()
         font.setPointSize(16)
         self.Eraser.setFont(font)
+        self.Eraser.clicked.connect(self.changePenColor)
         self.Eraser.setObjectName("Eraser")
 
         self.Clear_Screen = QtWidgets.QPushButton(self)
@@ -176,7 +185,7 @@ class WhiteBoardUI(QWidget):
         
 
     def startVWB(self):
-        self.vwb = VideoThread()
+        self.vwb = VideoThread(1)
         self.vwb.frame_signal.connect(self.upgrade_frames)
         self.vwb.start()
         pass
@@ -189,6 +198,80 @@ class WhiteBoardUI(QWidget):
             self.vwb.wait()
             print("Thread has stopped")
             self.vwb = None
+        pass
+
+    def presenter(self,path):
+        slide_path = path
+
+        try:
+            
+            image = cv2.imread(slide_path)
+            log.info("img read")
+
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image = Image.fromarray(np.asarray(image), mode='RGB')
+            qt_img = ImageQt.ImageQt(image)
+            qpixmap = QPixmap.fromImage(qt_img)
+
+            height = 720
+            width = 1280
+
+            new_size = QSize(width, height)
+            resized_frame_pixmap = qpixmap.scaled(new_size, Qt.KeepAspectRatio)
+            
+            log.info("converted")
+
+            return resized_frame_pixmap
+            pass
+        except Exception as e:
+            print(f"Error loading or converting image: {e}")
+            return None
+
+        # return qpixmap
+    pass
+
+    def saveSlides(self,pdf_path):
+        output_format = 18  # 17 corresponds to PNG format
+
+        pdf_doc = pymupdf.open(pdf_path)
+        self.total_slides = 0
+
+        for page_num in range(len(pdf_doc)):  # Loop through each page (slide)
+            self.total_slides = self.total_slides + 1
+            page = pdf_doc[page_num]
+            zoom = 2
+            slide_image = page.get_pixmap(matrix=pymupdf.Matrix(zoom,zoom))  # Extract the page image
+            slide_path = f"cache/slide_{page_num + 1}.png"
+            slide_image.save(slide_path)
+        pass
+
+    def pptSetup(self,path):
+        self.Application = win32com.client.Dispatch("PowerPoint.Application")
+        self.Presentation = self.Application.Presentations.Open(path)
+        print(self.Presentation.Name)
+
+        pdf_path = "./cache/presen1.pdf"
+        self.Presentation.SaveAs(pdf_path, FileFormat=32)
+
+        self.saveSlides(pdf_path)
+        log.info("File saved as PDF.")
+        pass
+
+    def ppts(self,path):
+        self.pptSetup(path)
+        time.sleep(5)
+        self.vwb = VideoThread(0)
+        self.vwb.frame_signal.connect(self.upgrade_slides)
+        self.vwb.start()
+        
+        pass
+
+    def upgrade_slides(self,frame_data):
+        slide_num = frame_data["slide_num"]
+        slide_pixmap = self.presenter(f"cache/slide_{slide_num}.png")
+
+        self.whiteboard.setPixmap(slide_pixmap)
+        log.info("slide is on board")
         pass
 
     def clearScreen(self):
@@ -232,6 +315,30 @@ class WhiteBoardUI(QWidget):
             pass
         pass
 
+    def changePenColor(self):
+        clicked_button_text = self.sender().text()
+
+        if clicked_button_text == "Red":
+            print("Red button clicked!")
+            self.vwb.drawColor = (0, 0, 255)
+            pass
+        elif clicked_button_text == "Green":
+            print("Green button clicked!")
+            self.vwb.drawColor = (0, 255, 0)
+            pass
+        elif clicked_button_text == "Blue":
+            print("Blue button clicked!")
+            self.vwb.drawColor = (255, 0, 0)
+            pass
+        elif clicked_button_text == "Eraser":
+            print("Eraser is activated!")
+            self.vwb.drawColor = (255, 255, 255)
+            pass
+        else:
+            print("Unexpected button clicked:", clicked_button_text)
+            pass
+        pass
+
     def set_image(self, image):
         self.Camera.setPixmap(QtGui.QPixmap.fromImage(image))
 
@@ -249,6 +356,24 @@ class WhiteBoardUI(QWidget):
         self.stop_vwb.setText(_translate("Whiteboard_GUI", "Stop VWB"))
         self.Camera.setText(_translate("Whiteboard_GUI", "Camera"))
 
+
+class WhiteBoard(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        pass
+
+    def ppts(self,path):
+        pass
+
+    def virtualWritting(self):
+        self.ui = WhiteBoardUI()
+        self.ui.show()
+        videoThread = VideoThread()
+
+        videoThread.frame_signal.connect(self.ui.upgrade_frames)
+        videoThread.start()
+        pass
+    pass
 
 if __name__ == "__main__":
     print(cv2.__version__)
